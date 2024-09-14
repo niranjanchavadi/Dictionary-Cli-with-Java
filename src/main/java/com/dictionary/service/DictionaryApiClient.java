@@ -4,13 +4,7 @@ import com.dictionary.Model.DictionaryEntry;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 import org.springframework.stereotype.Component;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -19,10 +13,42 @@ import java.net.URL;
 
 @Component
 public class DictionaryApiClient {
-    private static final String DICTIONARY_API_URL = "https://api.dictionaryapi.dev/api/v2/entries/en/";
 
+    private static final String DICTIONARY_API_URL = "https://api.dictionaryapi.dev/api/v2/entries/en/";
+    private static final String RANDOM_WORD_API_URL = "https://random-word-api.herokuapp.com/word";
+    private final Gson gson = new Gson();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    // Fetches word data from the dictionary API
     public DictionaryEntry[] getWordData(String word) throws IOException {
-        URL url = new URL(DICTIONARY_API_URL + word);
+        String url = DICTIONARY_API_URL + word;
+        String response = makeHttpGetRequest(url);
+
+        if (response == null) {
+            System.out.println("Word not found: " + word);
+            return null;
+        }
+
+        return gson.fromJson(response, DictionaryEntry[].class);
+    }
+
+    // Fetches a random word from the random word API
+    public String getRandomWord() throws IOException {
+        String response = makeHttpGetRequest(RANDOM_WORD_API_URL);
+
+        if (response != null) {
+            JsonNode jsonNode = objectMapper.readTree(response);
+            if (jsonNode.isArray() && jsonNode.size() > 0) {
+                return jsonNode.get(0).asText();
+            }
+        }
+
+        throw new IOException("Failed to fetch random word.");
+    }
+
+    // Utility method to make HTTP GET requests
+    private String makeHttpGetRequest(String urlString) throws IOException {
+        URL url = new URL(urlString);
         System.setProperty("http.agent", "Chrome");
 
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -32,46 +58,23 @@ public class DictionaryApiClient {
         int responseCode = conn.getResponseCode();
 
         if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
-            System.out.println("Word not found: " + word);
             return null;
         }
 
         if (responseCode != HttpURLConnection.HTTP_OK) {
-            throw new IOException("Failed to fetch data for word: " + word + ". Response code: " + responseCode);
+            throw new IOException("Failed to fetch data from " + urlString + ". Response code: " + responseCode);
         }
 
-        BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-        String inputLine;
-        StringBuilder content = new StringBuilder();
-
-        while ((inputLine = in.readLine()) != null) {
-            content.append(inputLine);
-        }
-
-        in.close();
-        conn.disconnect();
-
-        Gson gson = new Gson();
-        return gson.fromJson(content.toString(), DictionaryEntry[].class);
-    }
-
-    public String getRandomWord() throws IOException {
-        String randomWordApiUrl = "https://random-word-api.herokuapp.com/word";  // URL for random word API
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpGet request = new HttpGet(randomWordApiUrl);
-            try (CloseableHttpResponse response = client.execute(request)) {
-                if (response.getStatusLine().getStatusCode() != 200) {
-                    throw new IOException("Failed to fetch random word: HTTP error code " + response.getStatusLine().getStatusCode());
-                }
-                String jsonResponse = EntityUtils.toString(response.getEntity());
-                ObjectMapper mapper = new ObjectMapper();
-                JsonNode jsonNode = mapper.readTree(jsonResponse);
-                if (jsonNode.isArray() && jsonNode.size() > 0) {
-                    return jsonNode.get(0).asText();
-                } else {
-                    throw new IOException("Random word not found in the response.");
-                }
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+            StringBuilder content = new StringBuilder();
+            String inputLine;
+            while ((inputLine = in.readLine()) != null) {
+                content.append(inputLine);
             }
+            return content.toString();
+        } finally {
+            conn.disconnect();
         }
     }
 }
+
