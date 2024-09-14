@@ -1,124 +1,123 @@
 package com.dictionary.service;
-
 import com.dictionary.Model.DictionaryEntry;
-import com.dictionary.service.CommandHandler;
-import com.dictionary.service.DictionaryApiClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 public class WordGame {
-    private CommandHandler handler ;
-    private DictionaryApiClient apiClient ;
 
-    WordGame(){
+    private final DictionaryApiClient apiClient;
+    private CommandHandler handler;
 
-    }
-
-    public WordGame(DictionaryApiClient apiClient, CommandHandler handler) {
+    @Autowired
+    public WordGame(DictionaryApiClient apiClient) {
         this.apiClient = apiClient;
-        this.handler = handler;
     }
 
+    @Autowired
+    public void setCommandHandler(CommandHandler commandHandler) {
+        this.handler = commandHandler;
+    }
+
+    // Main game logic
     public void playGame() throws IOException {
-
-
         String word = apiClient.getRandomWord();
-
         DictionaryEntry[] entries = apiClient.getWordData(word);
+
         if (entries == null || entries.length == 0) {
             System.out.println("Word not found. Please try again later.");
             return;
         }
 
         DictionaryEntry entry = entries[0];
-        List<String> definitions = handler.getDefinitions(entry);
-        if (!definitions.isEmpty()) {
-            System.out.println("Definition: " + definitions.get(0));
+        Optional<String> definitionOpt = handler.getDefinitions(entry).stream().findFirst();
+
+        if (definitionOpt.isPresent()) {
+            System.out.println("Definition: " + definitionOpt.get());
         } else {
             System.out.println("No definitions available for the word.");
         }
 
-        Scanner scanner = new Scanner(System.in);
+        playGameLoop(word, entry);
+    }
 
-        while (true) {
+    private void playGameLoop(String word, DictionaryEntry entry) {
+        Scanner scanner = new Scanner(System.in);
+        boolean isGameOver = false;  // Flag to stop the game when the user chooses "quit"
+
+        while (!isGameOver) {  // Continue until user chooses to quit
             System.out.print("Enter the word: ");
             String userInput = scanner.nextLine().trim().toLowerCase();
-            List<String> synonyms = handler.getSynonyms(entry);
-            if (userInput.equals(word) || synonyms.contains(userInput)) {
+
+            if (isCorrectGuess(word, userInput, entry)) {
                 System.out.println("Correct! You've guessed the word.");
                 break;
             } else {
                 System.out.println("Incorrect.");
-                System.out.println("1. Try again");
-                System.out.println("2. Hint");
-                System.out.println("3. Quit");
-
-                String choice = scanner.nextLine().trim();
-
-                switch (choice) {
-                    case "1":
-                        // User chose to try again
-                        continue;
-                    case "2":
-                        // User chose to get a hint
-                        System.out.println("Hint: " + getHint(word, entry));
-                        break;
-                    case "3":
-                        // User chose to quit, reveal the word and dictionary data
-                        System.out.println("The word was \"" + word + "\". Full dictionary entry: " + handler.getdisplayFullDict(entry).toString());
-                        return; // Exit the game
-                    default:
-                        // Handle invalid input
-                        System.out.println("Invalid option. Please choose 1, 2, or 3.");
-                }
+                isGameOver = showOptions(scanner, word, entry);  // Pass the result of user's choice
             }
         }
     }
 
-    // Method to generate a hint for the word
+
+    // Checks if the user's input is correct (either the word or a synonym)
+    private boolean isCorrectGuess(String word, String userInput, DictionaryEntry entry) {
+        return userInput.equals(word) || handler.getSynonyms(entry).contains(userInput);
+    }
+
+    private boolean showOptions(Scanner scanner, String word, DictionaryEntry entry) {
+        System.out.println("1. Try again");
+        System.out.println("2. Hint");
+        System.out.println("3. Quit");
+
+        String choice = scanner.nextLine().trim();
+        switch (choice) {
+            case "1":
+                // User chose to try again
+                return false;  // Continue the game
+            case "2":
+                // User chose to get a hint
+                System.out.println("Hint: " + getHint(word, entry));
+                return false;  // Continue the game
+            case "3":
+                // User chose to quit
+                System.out.println("The word was \"" + word + "\".");
+                handler.displayFullDict(entry);
+                return true;  // End the game
+            default:
+                // Handle invalid input
+                System.out.println("Invalid option. Please choose 1, 2, or 3.");
+                return false;  // Continue the game if invalid option
+        }
+    }
+
+    // Generates a hint by shuffling the word or giving definitions, synonyms, or antonyms
     private String getHint(String word, DictionaryEntry entry) {
-        List<String> hints = new ArrayList<>();
-
-        // Add a shuffled version of the word as a hint
-        hints.add("Jumbled word: " + shuffleWord(word));
-
-        // Add available definitions, synonyms, and antonyms as hints
-        hints.addAll(handler.getDefinitions(entry));
+        List<String> hints = new ArrayList<>(handler.getDefinitions(entry));
         hints.addAll(handler.getSynonyms(entry));
         hints.addAll(handler.getAntonyms(entry));
 
-        // Return a random hint from the list
         if (hints.isEmpty()) {
             return "No hints available.";
-        } else {
-            return hints.get(new Random().nextInt(hints.size()));
         }
+
+        // Adding a jumbled version of the word as a hint
+        hints.add("Jumbled word: " + shuffleWord(word));
+
+        return hints.get(new Random().nextInt(hints.size()));
     }
 
-    // Method to shuffle the characters of the word for a hint
-    private static String shuffleWord(String word) {
-        List<Character> characters = new ArrayList<>();
-        for (char c : word.toCharArray()) {
-            characters.add(c);
-        }
-        // Shuffle the list of characters
+    // Shuffles the characters of the word for a hint
+    private String shuffleWord(String word) {
+        List<Character> characters = word.chars()
+                .mapToObj(c -> (char) c)
+                .collect(Collectors.toList());
         Collections.shuffle(characters);
-
-        // Rebuild the word from the shuffled characters
-        StringBuilder shuffledWord = new StringBuilder();
-        for (char c : characters) {
-            shuffledWord.append(c);
-        }
-
-        return shuffledWord.toString();
-    }
-
-
-    // Setter for apiClient, in case it needs to be set externally
-    public void setApiClient(DictionaryApiClient apiClient) {
-        this.apiClient = apiClient;
+        return characters.stream()
+                .collect(StringBuilder::new, StringBuilder::append, StringBuilder::append)
+                .toString();
     }
 }
