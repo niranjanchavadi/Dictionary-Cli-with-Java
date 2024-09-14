@@ -1,7 +1,5 @@
 # Dictionary-Cli-with-Java
 
-# Defining the content again and saving it to the README.md file
-
 readme_content = """
 # Command-Line Dictionary Tool
 
