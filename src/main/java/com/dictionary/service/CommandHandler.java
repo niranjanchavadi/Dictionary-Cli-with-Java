@@ -1,194 +1,131 @@
 package com.dictionary.service;
-
 import com.dictionary.Model.Definition;
 import com.dictionary.Model.DictionaryEntry;
-import com.dictionary.Model.Meaning;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
-
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class CommandHandler {
+    private final WordGame wordGame;
+    private final DictionaryApiClient apiClient;
 
-    private DictionaryApiClient apiClient ;
-
-    private WordGame wordGame;
-
-    CommandHandler(){}
-
-    public CommandHandler(WordGame wordGame, DictionaryApiClient apiClient ) {
+    @Autowired
+    public CommandHandler(@Lazy WordGame wordGame, DictionaryApiClient apiClient) {
         this.wordGame = wordGame;
         this.apiClient = apiClient;
     }
+
 
     public void handleCommand(String[] args) throws IOException {
         String command;
         String word = null;
 
-        // Check if no command or word is provided
         if (args.length == 0) {
             command = "full";
-            word = apiClient.getRandomWord(); // Fetch a random word from the API
+            word = apiClient.getRandomWord();
             System.out.println("Word of the Day: " + word);
         } else if (args.length == 1) {
-            command = args[0]; // The argument is either a command or word
+            command = args[0];
             if (!"play".equals(command)) {
-                word = command; // If it's not play, assume it's the word
-                command = "full"; // Treat it as full dict
+                word = command;
+                command = "full";
             }
         } else {
-            command = args[0]; // First argument is the command
-            word = args[1]; // Second argument is the word
+            command = args[0];
+            word = args[1];
         }
 
-        // Log the command and word for debugging
         System.out.println("Command: " + command + ", Word: " + word);
 
         if ("play".equals(command)) {
             wordGame.playGame();
         } else {
-            // Fetch word data from the API
             DictionaryEntry[] entries = apiClient.getWordData(word);
             if (entries.length == 0) {
                 System.out.println("Word not found.");
                 return;
             }
 
-            // Get the first dictionary entry
             DictionaryEntry entry = entries[0];
-
-            // Handle other commands
-            switch (command) {
-                case "def":
-                    displayDefinitions(entry);
-                    break;
-                case "syn":
-                    displaySynonyms(entry);
-                    break;
-                case "ant":
-                    displayAntonyms(entry);
-                    break;
-                case "ex":
-                    displayExamples(entry);
-                    break;
-                case "full":
-                    displayFullDict(entry);
-                    break;
-                default:
-                    System.out.println("Unknown command: " + command);
-                    break;
-            }
+            processCommand(command, entry);
         }
     }
 
-    private void displayDefinitions(DictionaryEntry entry) {
-        System.out.println("Definitions for " + entry.getWord() + ":");
-        for (Meaning meaning : entry.getMeanings()) {
-            for (Definition definition : meaning.getDefinitions()) {
-                System.out.println("-" + definition.getDefinition());
-            }
+    private void processCommand(String command, DictionaryEntry entry) {
+        switch (command) {
+            case "def":
+                displayInformation(entry, this::getDefinitions, "Definitions");
+                break;
+            case "syn":
+                displayInformation(entry, this::getSynonyms, "Synonyms");
+                break;
+            case "ant":
+                displayInformation(entry, this::getAntonyms, "Antonyms");
+                break;
+            case "ex":
+                displayInformation(entry, this::getExamples, "Examples");
+                break;
+            case "full":
+                displayFullDict(entry);
+                break;
+            default:
+                System.out.println("Unknown command: " + command);
         }
     }
 
-    private void displaySynonyms(DictionaryEntry entry) {
-        System.out.println("Synonyms for " + entry.getWord() + ":");
-        for (Meaning meaning : entry.getMeanings()) {
-            for (String synonym : meaning.getSynonyms()) {
-                if (!synonym.isEmpty()) {
-                    System.out.println("-" + String.join(", ", synonym));
-
-                }
-            }
-        }
-    }
-
-
-    private void displayAntonyms(DictionaryEntry entry) {
-        System.out.println("Antonyms for " + entry.getWord() + ":");
-        for (Meaning meaning : entry.getMeanings()) {
-            for (String antonym : meaning.getAntonyms()) {
-                if (!antonym.isEmpty()) {
-                    System.out.println("-" + String.join(",", antonym));
-
-                }
-            }
-        }
-    }
-
-    private void displayExamples(DictionaryEntry entry) {
-        System.out.println("Examples for " + entry.getWord() + ":");
-        for (Meaning meaning : entry.getMeanings()) {
-            for (Definition definition : meaning.getDefinitions()) {
-                if (definition.getExample() != null) {
-                    System.out.println("-" + definition.getExample());
-
-                }
-            }
-        }
+    private void displayInformation(DictionaryEntry entry, InfoExtractor extractor, String label) {
+        List<String> info = extractor.extract(entry);
+        System.out.println(label + " for " + entry.getWord() + ":");
+        info.forEach(item -> System.out.println("- " + item));
     }
 
     public void displayFullDict(DictionaryEntry entry) {
-        displayDefinitions(entry);
-        displaySynonyms(entry);
-        displayAntonyms(entry);
-        displayExamples(entry);
-
+        displayInformation(entry, this::getDefinitions, "Definitions");
+        displayInformation(entry, this::getSynonyms, "Synonyms");
+        displayInformation(entry, this::getAntonyms, "Antonyms");
+        displayInformation(entry, this::getExamples, "Examples");
     }
 
-    public List<List<String>> getdisplayFullDict(DictionaryEntry entry) {
-       List<List<String>>  list = new ArrayList<>();
-        list.add(getDefinitions(entry));
-        list.add(getSynonyms(entry));
-        list.add(getAntonyms(entry));
-     return list;
-    }
-
-
-    //Method to get Antonyms from a DictionaryEntry
-    public List<String> getAntonyms(DictionaryEntry entry) {
-        System.out.println("Antonyms for " + entry.getWord() + ":");
-        List<String> antonymList = new ArrayList<>();
-        // Iterate over the meanings of the entry
-        for (Meaning meaning : entry.getMeanings()) {
-            for (String antonym : meaning.getAntonyms()) {
-                // Add non-empty antonyms to the list
-                if (!antonym.isEmpty()) {
-                    antonymList.add(antonym);
-                }
-            }
-        }
-        return antonymList;
-    }
-
-    // Method to get Synonyms from a DictionaryEntry
-    public List<String> getSynonyms(DictionaryEntry entry) {
-        System.out.println("Synonyms for " + entry.getWord() + ":");
-        List<String> synonymList = new ArrayList<>();
-        for (Meaning meaning : entry.getMeanings()) {
-            for (String synonym : meaning.getSynonyms()) {
-                if (!synonym.isEmpty()) {
-                    System.out.println("- " + synonym);
-                    synonymList.add(synonym);
-                }
-            }
-        }
-        return synonymList;
-    }
+    // Extractors
 
     public List<String> getDefinitions(DictionaryEntry entry) {
-        List<String> defList = new ArrayList<>();
-        for (Meaning meaning : entry.getMeanings()) {
-            for (Definition definition : meaning.getDefinitions()) {
-                // Add the definition to the list
-                defList.add(definition.getDefinition());
-            }
-        }
-        return defList;
+        return entry.getMeanings().stream()
+                .flatMap(meaning -> meaning.getDefinitions().stream())
+                .map(Definition::getDefinition)
+                .collect(Collectors.toList());
     }
 
+    public List<String> getSynonyms(DictionaryEntry entry) {
+        return entry.getMeanings().stream()
+                .flatMap(meaning -> meaning.getSynonyms().stream())
+                .filter(synonym -> !synonym.isEmpty())
+                .collect(Collectors.toList());
+    }
 
+    public List<String> getAntonyms(DictionaryEntry entry) {
+        return entry.getMeanings().stream()
+                .flatMap(meaning -> meaning.getAntonyms().stream())
+                .filter(antonym -> !antonym.isEmpty())
+                .collect(Collectors.toList());
+    }
+
+    private List<String> getExamples(DictionaryEntry entry) {
+        return entry.getMeanings().stream()
+                .flatMap(meaning -> meaning.getDefinitions().stream())
+                .map(Definition::getExample)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    @FunctionalInterface
+    private interface InfoExtractor {
+        List<String> extract(DictionaryEntry entry);
+    }
 }
 
 
