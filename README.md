@@ -1,8 +1,5 @@
 # Dictionary-Cli-with-Java
 
-readme_content = """
-# Command-Line Dictionary Tool
-
 ## Overview
 This command-line dictionary tool allows users to retrieve word definitions, synonyms, antonyms, and examples directly from the command line. It also includes a word guessing game and a Word of the Day feature, powered by an external dictionary API.
 
@@ -41,7 +38,52 @@ This command-line dictionary tool allows users to retrieve word definitions, syn
 ```bash
 git clone https://github.com/niranjanchavadi/Dictionary-Cli-with-Java.git
 
+2 create jar
+```bash
+ ./gradlew bootJar
 
+3 Than
+```bash
+cd build/libs
+
+Here is the theoretical description for each command:
+
+Word Definitions
+Fetch and display the definitions of the word provided as input.
+```bash
+java -jar dictionary-0.0.1-SNAPSHOT.jar def <word>
+
+Word Synonyms
+Display a list of synonyms for the given word to understand its alternative meanings.
+```bash
+java -jar dictionary-0.0.1-SNAPSHOT.jar syn <word>
+
+Word Antonyms
+Display the antonyms of the given word, showing opposite meanings.
+```bash
+java -jar dictionary-0.0.1-SNAPSHOT.jar ant <word>
+
+Word Examples
+Provide usage examples of the word in sentences to give context.
+```bash
+java -jar dictionary-0.0.1-SNAPSHOT.jar ex <word>
+
+Word Full Dict
+Display comprehensive information about the word, including definitions, synonyms, antonyms, and examples.
+```bash
+java -jar dictionary-0.0.1-SNAPSHOT.jar <word>
+
+Word of the Day Full Dict
+Use the API to fetch and display all the information (definitions, synonyms, antonyms, examples) for a randomly chosen word.
+```bash
+java -jar dictionary-0.0.1-SNAPSHOT.jar
+
+Word Game
+Engage in an interactive game where the user guesses a word based on definitions, synonyms, or antonyms, with options for hints and retries.
+```bash
+java -jar dictionary-0.0.1-SNAPSHOT.jar play
+
+Each command provides a specific feature of the dictionary, ranging from displaying specific word data to engaging in an interactive word-guessing game.
 
 
 
